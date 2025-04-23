@@ -47,6 +47,7 @@ def serialize_template_field(template_field: Any, name: str) -> str | dict | lis
             return True
         except (TypeError, OverflowError):
             return False
+        return True
 
     def translate_tuples_to_lists(obj: Any):
         """Recursively convert tuples to lists."""
