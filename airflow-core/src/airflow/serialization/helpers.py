@@ -31,15 +31,22 @@ def serialize_template_field(template_field: Any, name: str) -> str | dict | lis
 
     If ``templated_field`` contains a class or instance that requires recursive
     templating, store them as strings. Otherwise simply return the field as-is.
+    
+    Args:
+        template_field: The field to serialize
+        name: Name of the field (used for redaction)
+        
+    Returns:
+        A serializable representation of the templated field
     """
 
-    def is_jsonable(x):
+    def is_jsonable(x: Any) -> bool:
+        """Check if an object can be directly serialized to JSON."""
         try:
             json.dumps(x)
+            return True
         except (TypeError, OverflowError):
             return False
-        else:
-            return True
 
     def translate_tuples_to_lists(obj: Any):
         """Recursively convert tuples to lists."""
@@ -51,30 +58,30 @@ def serialize_template_field(template_field: Any, name: str) -> str | dict | lis
             return {key: translate_tuples_to_lists(value) for key, value in obj.items()}
         return obj
 
+    # Constant for truncation message offset
+    TRUNCATION_OFFSET = 79
     max_length = conf.getint("core", "max_templated_field_length")
+
+    def truncate_if_needed(value: str) -> str:
+        """Truncate value if it exceeds max_length."""
+        if len(value) > max_length:
+            rendered = redact(value, name)
+            return (
+                "Truncated. You can change this behaviour in [core]max_templated_field_length. "
+                f"{rendered[: max_length - TRUNCATION_OFFSET]!r}... "
+            )
+        return value
 
     if not is_jsonable(template_field):
         try:
             serialized = template_field.serialize()
         except AttributeError:
             serialized = str(template_field)
-        if len(serialized) > max_length:
-            rendered = redact(serialized, name)
-            return (
-                "Truncated. You can change this behaviour in [core]max_templated_field_length. "
-                f"{rendered[: max_length - 79]!r}... "
-            )
-        return serialized
+        return truncate_if_needed(serialized) if isinstance(serialized, str) else serialized
     if not template_field and not isinstance(template_field, tuple):
         # Avoid unnecessary serialization steps for empty fields unless they are tuples
         # and need to be converted to lists
         return template_field
     template_field = translate_tuples_to_lists(template_field)
     serialized = str(template_field)
-    if len(serialized) > max_length:
-        rendered = redact(serialized, name)
-        return (
-            "Truncated. You can change this behaviour in [core]max_templated_field_length. "
-            f"{rendered[: max_length - 79]!r}... "
-        )
-    return template_field
+    return truncate_if_needed(serialized) if isinstance(serialized, str) else template_field
