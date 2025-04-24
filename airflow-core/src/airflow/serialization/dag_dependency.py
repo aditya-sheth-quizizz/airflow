@@ -117,5 +117,5 @@ class DagDependency:
         if self.dependency_type not in ("asset", "asset-alias", "asset-name-ref", "asset-uri-ref"):
             val = f"{val}:{self.source}:{self.target}"
         if self.dependency_id:
-            val = f"{val}:{self.dependency_id}"
+            val = f"{val}="
         return val
